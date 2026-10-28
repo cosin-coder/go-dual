@@ -48,7 +48,7 @@ func (b *DualRouteBuilder) Tag(name string) *DualRouteBuilder {
 // ==========================================
 
 // 注册泛型 JSON 路由
-func RouteTyped[T any](mux *http.ServeMux, b *DualRouteBuilder, handler func(espData T) (any, error)) {
+func RouteTyped[T any](mux *http.ServeMux, handler func(espData T) (any, error), b *DualRouteBuilder) {
 	coreHandle(mux, b, func(rawString string) (any, error) {
 		var parsedData T
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
