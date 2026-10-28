@@ -63,7 +63,7 @@ func RouteTyped[T any](mux *http.ServeMux, b *DualRouteBuilder, handler func(esp
 }
 
 // 注册纯文本/HTML 路由
-func Route(mux *http.ServeMux, b *DualRouteBuilder, handler func(espData string) (any, error)) {
+func Route(mux *http.ServeMux, handler func(espData string) (any, error), b *DualRouteBuilde) {
 	coreHandle(mux, b, handler)
 }
 
