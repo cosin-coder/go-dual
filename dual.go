@@ -21,13 +21,12 @@ type DualRouteBuilder struct {
 	tag       string
 }
 
-// 构造函数
 func NewDual(path, method, clientUrl string) *DualRouteBuilder {
 	return &DualRouteBuilder{
 		path:      path,
 		method:    method,
 		clientUrl: clientUrl,
-		timeout:   3 * time.Second,
+		timeout:   3 * time.Second, 
 		tag:       "未命名接口",
 	}
 }
@@ -60,6 +59,7 @@ func (b *TypedDualRouteBuilder[T]) Handle(mux *http.ServeMux, handler func(espDa
 	coreHandle(mux, b.DualRouteBuilder, func(rawString string) (any, error) {
 		var parsedData T
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
+			// 解析失败兜底，保护业务逻辑不崩溃
 			return map[string]string{
 				"error":   "硬件数据解析失败",
 				"details": err.Error(),
@@ -118,7 +118,6 @@ func coreHandle(mux *http.ServeMux, b *DualRouteBuilder, handler func(string) (a
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		switch v := result.(type) {
 		case string:
 			if strings.HasPrefix(strings.TrimSpace(v), "<") {
