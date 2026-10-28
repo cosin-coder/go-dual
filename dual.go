@@ -13,6 +13,9 @@ import (
 
 var dualSemaphore = make(chan struct{}, 5)
 
+// ==========================================
+// 基础 Builder
+// ==========================================
 type DualRouteBuilder struct {
 	path      string
 	method    string
@@ -26,7 +29,7 @@ func NewDual(path, method, clientUrl string) *DualRouteBuilder {
 		path:      path,
 		method:    method,
 		clientUrl: clientUrl,
-		timeout:   3 * time.Second, 
+		timeout:   3 * time.Second,
 		tag:       "未命名接口",
 	}
 }
@@ -45,6 +48,9 @@ func (b *DualRouteBuilder) Route(mux *http.ServeMux, handler func(espData string
 	coreHandle(mux, b, handler)
 }
 
+// ==========================================
+// 泛型 Builder (链式保持)
+// ==========================================
 type TypedDualRouteBuilder[T any] struct {
 	*DualRouteBuilder
 }
@@ -55,11 +61,23 @@ func Typed[T any](path, method, clientUrl string) *TypedDualRouteBuilder[T] {
 	}
 }
 
+// 🌟 关键：重写 Tag，强制返回泛型结构体，保持链式不断
+func (b *TypedDualRouteBuilder[T]) Tag(name string) *TypedDualRouteBuilder[T] {
+	b.DualRouteBuilder.Tag(name)
+	return b
+}
+
+// 🌟 关键：重写 Timeout，强制返回泛型结构体，保持链式不断
+func (b *TypedDualRouteBuilder[T]) Timeout(ms int) *TypedDualRouteBuilder[T] {
+	b.DualRouteBuilder.Timeout(ms)
+	return b
+}
+
+// Handle 方法
 func (b *TypedDualRouteBuilder[T]) Handle(mux *http.ServeMux, handler func(espData T) (any, error)) {
 	coreHandle(mux, b.DualRouteBuilder, func(rawString string) (any, error) {
 		var parsedData T
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
-			// 解析失败兜底，保护业务逻辑不崩溃
 			return map[string]string{
 				"error":   "硬件数据解析失败",
 				"details": err.Error(),
@@ -70,6 +88,9 @@ func (b *TypedDualRouteBuilder[T]) Handle(mux *http.ServeMux, handler func(espDa
 	})
 }
 
+// ==========================================
+// 底层核心逻辑
+// ==========================================
 func coreHandle(mux *http.ServeMux, b *DualRouteBuilder, handler func(string) (any, error)) {
 	fmt.Printf("📌 注册路由: [%s] %s %s (超时: %v)\n", b.tag, b.method, b.path, b.timeout)
 
