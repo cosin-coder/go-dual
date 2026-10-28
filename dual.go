@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// 内置协程背压：限制最多同时 5 个请求访问 ESP32
 var dualSemaphore = make(chan struct{}, 5)
 
 type DualRouteBuilder struct {
@@ -22,7 +21,7 @@ type DualRouteBuilder struct {
 	tag       string
 }
 
-// 构造函数，相当于 Kotlin 的 Route.Dual(...)
+// 创建 Builder（保持原样）
 func NewDual(path, method, clientUrl string) *DualRouteBuilder {
 	return &DualRouteBuilder{
 		path:      path,
@@ -33,42 +32,47 @@ func NewDual(path, method, clientUrl string) *DualRouteBuilder {
 	}
 }
 
-// 链式配置：超时时间
 func (b *DualRouteBuilder) Timeout(ms int) *DualRouteBuilder {
 	b.timeout = time.Duration(ms) * time.Millisecond
 	return b
 }
 
-// 链式配置：标签
 func (b *DualRouteBuilder) Tag(name string) *DualRouteBuilder {
 	b.tag = name
 	return b
 }
 
-// 泛型版本（支持自动反序列化）
-func GetTyped[T any](b *DualRouteBuilder, handler func(espData T) (any, error)) {
-	b.handle(func(rawString string) (any, error) {
+// ==========================================
+// 🌟 核心改动：提供 Route 和 RouteTyped 全局函数
+// 接收 mux，绑定 builder，最后执行业务 handler
+// ==========================================
+
+// 注册泛型 JSON 路由
+func RouteTyped[T any](mux *http.ServeMux, b *DualRouteBuilder, handler func(espData T) (any, error)) {
+	coreHandle(mux, b, func(rawString string) (any, error) {
 		var parsedData T
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
 			return map[string]string{
-				"error":    "硬件数据反序列化失败",
-				"details":  err.Error(),
-				"raw_data": rawString,
+				"error":   "硬件数据解析失败",
+				"details": err.Error(),
+				"raw":     rawString,
 			}, nil
 		}
 		return handler(parsedData)
 	})
 }
 
-// String 版本（支持网页拉取、纯文本）
-func (b *DualRouteBuilder) Get(handler func(espData string) (any, error)) {
-	b.handle(handler)
+// 注册纯文本/HTML 路由
+func Route(mux *http.ServeMux, b *DualRouteBuilder, handler func(espData string) (any, error)) {
+	coreHandle(mux, b, handler)
 }
 
-func (b *DualRouteBuilder) handle(handler func(rawString string) (any, error)) {
-	fmt.Printf("📌 注册路由: [%s] %s %s (超时: %v)\n", b.tag, b.method, b.path, b.timeout)
+// 底层注册逻辑
+func coreHandle(mux *http.ServeMux, b *DualRouteBuilder, handler func(string) (any, error)) {
+	fmt.Printf("📌 注册路由到 Mux: [%s] %s %s (超时: %v)\n", b.tag, b.method, b.path, b.timeout)
 
-	http.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
+	// 🌟 直接将路由挂载到传入的 mux 上
+	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
 		dualSemaphore <- struct{}{}
 		defer func() { <-dualSemaphore }()
 
@@ -97,7 +101,7 @@ func (b *DualRouteBuilder) handle(handler func(rawString string) (any, error)) {
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
-		
+
 		var rawString string
 		if err != nil {
 			rawString = fmt.Sprintf(`{"error": "无法连接硬件: %v"}`, err)
