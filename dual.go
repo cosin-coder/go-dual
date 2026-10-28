@@ -47,23 +47,19 @@ func (b *DualRouteBuilder) Tag(name string) *DualRouteBuilder {
 // 接收 mux，绑定 builder，最后执行业务 handler
 // ==========================================
 
-// 注册泛型 JSON 路由
-func RouteTyped[T any](mux *http.ServeMux, handler func(espData T) (any, error), b *DualRouteBuilder) {
+// 顺序：mux, builder, handler
+func RouteTyped[T any](mux *http.ServeMux, b *DualRouteBuilder, handler func(espData T) (any, error)) {
 	coreHandle(mux, b, func(rawString string) (any, error) {
 		var parsedData T
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
-			return map[string]string{
-				"error":   "硬件数据解析失败",
-				"details": err.Error(),
-				"raw":     rawString,
-			}, nil
+			return map[string]string{"error": "解析失败"}, nil
 		}
 		return handler(parsedData)
 	})
 }
 
-// 注册纯文本/HTML 路由
-func Route(mux *http.ServeMux, handler func(espData string) (any, error), b *DualRouteBuilde) {
+// 修复拼写错误，顺序同上
+func Route(mux *http.ServeMux, b *DualRouteBuilder, handler func(espData string) (any, error)) {
 	coreHandle(mux, b, handler)
 }
 
