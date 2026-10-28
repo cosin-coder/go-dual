@@ -77,7 +77,18 @@ func (b *TypedDualRouteBuilder[T]) Timeout(ms int) *TypedDualRouteBuilder[T] {
 func (b *TypedDualRouteBuilder[T]) Handle(mux *http.ServeMux, handler func(espData T) (any, error)) {
 	coreHandle(mux, b.DualRouteBuilder, func(rawString string) (any, error) {
 		var parsedData T
+		
+		// 🌟 魔法时刻：判断 T 是不是 string 类型
+		var zeroValue T
+		if _, isString := any(zeroValue).(string); isString {
+			// 如果是纯文本/HTML，直接把原始字符串转换并返回，跳过 JSON 解析
+			parsedData = any(rawString).(T)
+			return handler(parsedData)
+		}
+
+		// 否则，如果是结构体等强类型，走正常的 JSON 解析
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
+			// 解析失败兜底，保护业务逻辑不崩溃
 			return map[string]string{
 				"error":   "硬件数据解析失败",
 				"details": err.Error(),
