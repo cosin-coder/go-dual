@@ -18,7 +18,7 @@ type Router interface {
 }
 
 // ==========================================
-// Configuration Struct
+// 🌟 Configuration Struct (新增：统一配置)
 // ==========================================
 type DualConfig struct {
 	Path      string
@@ -37,6 +37,7 @@ type DualRouteBuilder struct {
 	tag       string
 }
 
+// 🌟 改造：接收 DualConfig
 func NewDual(cfg DualConfig) *DualRouteBuilder {
 	method := cfg.Method
 	if method == "" {
@@ -47,7 +48,7 @@ func NewDual(cfg DualConfig) *DualRouteBuilder {
 		method:    strings.ToUpper(method),
 		clientUrl: cfg.ClientURL,
 		timeout:   3 * time.Second,
-		tag:       "Unnamed API", // Trans: 未命名接口
+		tag:       "Unnamed API",
 	}
 }
 
@@ -66,12 +67,13 @@ func (b *DualRouteBuilder) Route(mux Router, handler func(espData string) (any, 
 }
 
 // ==========================================
-// Generic Builder (Keeps Chaining)
+// Typed Builder (Keeps Chaining)
 // ==========================================
 type TypedDualRouteBuilder[T any] struct {
 	*DualRouteBuilder
 }
 
+// 🌟 改造：接收 DualConfig
 func Typed[T any](cfg DualConfig) *TypedDualRouteBuilder[T] {
 	return &TypedDualRouteBuilder[T]{
 		DualRouteBuilder: NewDual(cfg),
@@ -102,7 +104,7 @@ func (b *TypedDualRouteBuilder[T]) Handle(mux Router, handler func(espData T) (a
 		// 2. JSON parsing
 		if err := json.Unmarshal([]byte(rawString), &parsedData); err != nil {
 			return map[string]string{
-				"error":   "Hardware data parsing failed", // Trans: 硬件数据解析失败
+				"error":   "Hardware data parsing failed",
 				"details": err.Error(),
 				"raw":     rawString,
 			}, nil
@@ -117,11 +119,11 @@ func (b *TypedDualRouteBuilder[T]) Handle(mux Router, handler func(espData T) (a
 func coreHandle(mux Router, b *DualRouteBuilder, handler func(string) (any, error)) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic during route registration [%s] %s: %v", b.method, b.path, r) // Trans: 注册路由时发生崩溃
+			err = fmt.Errorf("panic during route registration [%s] %s: %v", b.method, b.path, r)
 		}
 	}()
 
-	fmt.Printf("📌 Registered Route: [%s] %s %s (Timeout: %v)\n", b.tag, b.method, b.path, b.timeout) // Trans: 注册路由
+	fmt.Printf("📌 Registered Route: [%s] %s %s (Timeout: %v)\n", b.tag, b.method, b.path, b.timeout)
 
 	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
 		// 1. Verify HTTP Method
@@ -149,7 +151,7 @@ func coreHandle(mux Router, b *DualRouteBuilder, handler func(string) (any, erro
 
 		req, err := http.NewRequestWithContext(ctx, b.method, fullUrl, bodyReader)
 		if err != nil {
-			http.Error(w, "Failed to build request", http.StatusInternalServerError) // Trans: 构建请求失败
+			http.Error(w, "Failed to build request", http.StatusInternalServerError)
 			return
 		}
 
@@ -162,7 +164,7 @@ func coreHandle(mux Router, b *DualRouteBuilder, handler func(string) (any, erro
 
 		var rawString string
 		if err != nil {
-			rawString = fmt.Sprintf(`{"error": "Failed to connect to hardware: %v"}`, err) // Trans: 无法连接硬件
+			rawString = fmt.Sprintf(`{"error": "Failed to connect to hardware: %v"}`, err)
 		} else {
 			defer resp.Body.Close()
 			respBytes, _ := io.ReadAll(resp.Body)
